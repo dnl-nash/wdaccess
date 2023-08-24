@@ -1,0 +1,284 @@
+#!/bin/zsh
+umask 022
+if which waydroid > /dev/null 2>/dev/null;then
+sleep .01
+else
+echo please install waydroid package
+export reqs=$reqs" waydroid "
+fi
+if which curl > /dev/null 2>/dev/null;then
+sleep .01
+else
+echo please install curl package
+export reqs=$reqs" curl "
+fi
+if which unzip > /dev/null 2>/dev/null;then
+sleep .01
+else
+echo please install unzip package
+export reqs=$reqs" unzip "
+fi
+if which e2fsck > /dev/null 2>/dev/null;then
+sleep .01
+else
+echo please install e2fsprogs package
+export reqs=$reqs" e2fsprogs "
+fi
+if which resize2fs > /dev/null 2>/dev/null;then
+sleep .01
+else
+echo please install e2fsprogs package
+export reqs=$reqs" e2fsprogs "
+fi
+if which lynx > /dev/null 2>/dev/null;then
+sleep .01
+else
+echo please install lynx package
+export reqs=$reqs" lynx "
+fi
+if which sudo > /dev/null 2>/dev/null;then
+sleep .01
+else
+echo please install sudo package
+export reqs=$reqs" sudo "
+fi
+if which nmap > /dev/null 2>/dev/null;then
+sleep .01
+else
+echo please install nmap package
+export reqs=$reqs" nmap "
+fi
+if which ifconfig > /dev/null 2>/dev/null;then
+sleep .01
+else
+echo please install net-tools package
+export reqs=$reqs" ifconfig "
+fi
+if which weston > /dev/null 2>/dev/null;then
+sleep .01
+else
+echo please install weston package
+export reqs=$reqs" weston "
+fi
+if which adb > /dev/null 2>/dev/null;then
+sleep .01
+else
+echo please install android-sdk-platform-tools package
+export reqs=$reqs" android-sdk-platform-tools "
+fi
+if which sqlite3 > /dev/null 2>/dev/null;then
+sleep .01
+else
+echo please install sqlite package
+export reqs=$reqs" sqlite "
+fi
+if which xsel > /dev/null 2>/dev/null;then
+sleep .01
+else
+echo please install xsel package
+export reqs=$reqs" xsel "
+fi
+if which xdg-open > /dev/null 2>/dev/null;then
+sleep .01
+else
+echo please install xdg-utils package
+export reqs=$reqs" xdg-utils "
+fi
+if which pyclip > /dev/null 2>/dev/null;then
+sleep .01
+else
+echo please install python-pyclip package
+export reqs=$reqs" python-pyclip "
+fi
+if ls /dev|grep -q binder;then
+sleep .01
+else
+if modprobe -q binder_linux;then
+echo binder_linux >> /etc/modules-load.d/waydroid-binder.conf
+else
+export binderstate=`cat /proc/config.gz|gunzip|grep CONFIG_ANDROID_BINDERFS|cut -f 2 -d =`
+if [ $binderstate = "y" ]||[ $binderstate = "m" ];then
+sleep .01
+else
+echo please load binder module
+export reqs=$reqs" binder_linux-dkms "
+fi
+fi
+fi
+if [ -z $SUDO_USER ];then
+echo please run this script under sudo
+export reqs=$reqs" SUDO_USER "
+fi
+if [ -z $reqs ];then
+sleep .01
+else
+echo the following requirements are missing: $reqs
+exit 48
+fi
+export myname=`echo $0|tr . \\\n`
+if echo $myname|grep -qw nogoogle;then
+export nogoogle=1
+fi
+if echo $myname|grep -qw nodesktop;then
+export nodesktop=1
+fi
+if echo $myname|grep -qw notermux;then
+export notermux=1
+fi
+if echo $myname|grep -qw noinit;then
+export noinit=1
+fi
+if echo $myname|grep -qw notrans;then
+export notrans=1
+fi
+if [ -z $noinit ];then
+if [ -e /var/lib/waydroid/images/system.img ];then
+sleep .01
+else
+rm /var/lib/waydroid/waydroid.* /var/lib/waydroid/waydroid_base.prop
+if [ -z $nogoogle ];then
+export systype=GAPPS
+else
+export systype=VANILLA
+fi
+while true;do
+if waydroid init -f -s $systype;then
+rm /tmp/wdinit
+systemctl enable waydroid-container
+break
+else
+continue
+fi
+done
+fi
+else
+sleep .01
+fi
+for f in `ls /var/lib/waydroid/images`;do
+export size=`wc -c /var/lib/waydroid/images/$f|cut -f 1 -d \  `
+export newsize=$(($size*2))
+e2fsck -f /var/lib/waydroid/images/$f
+truncate -s $newsize /var/lib/waydroid/images/$f
+e2fsck -f /var/lib/waydroid/images/$f
+resize2fs /var/lib/waydroid/images/$f
+case "$f" in
+system.img)
+mount /var/lib/waydroid/images/$f /mnt
+;;
+vendor.img)
+mount /var/lib/waydroid/images/$f /mnt/vendor
+;;
+esac
+done
+export mytmp=`mktemp -d`
+cd $mytmp
+if [ -z $notrans ];then
+if uname -m|grep -qw x86_64;then
+curl -Lo trans.zip https://github.com/newbit1/libndk_translation_Module/archive/c6077f3398172c64f55aad7aab0e55fad9110cf3.zip
+unzip trans.zip
+cp -rf */system/* /mnt/system/
+for f in `cat */system.prop|grep =|cut -f 1 -d =`;do
+sed -i "/$f/d" /mnt/*/*/*/*.prop
+sed -i "/$f/d" /mnt/*/*/*.prop
+sed -i "/$f/d" /mnt/*/*.prop
+sed -i "/$f/d" /mnt/*.prop
+done
+cat */system.prop >> /mnt/system/build.prop
+fi
+else
+sleep .01
+fi
+umount /mnt/vendor /mnt
+systemctl restart waydroid-container
+sudo -u $SUDO_USER sh -c "export XDG_RUNTIME_DIR=/run/user/\`id -u\`;weston -Swaydroid&export WAYLAND_DISPLAY=waydroid;sleep 2;waydroid show-full-ui"&
+curl -LO https://nashcentral.duckdns.org/projects/espeak.apk
+curl -LO https://nashcentral.duckdns.org/projects/talkback-phone.apk
+while true;do
+nmap `ifconfig waydroid0|grep -w inet|tr -s \  |cut -f 3 -d \  |cut -f 1-3 -d .|tr -d \\\n;echo -n .0/24`|grep --before-context=4 5555/tcp|head -n 1|sed "s|Nmap scan report for ||g"|read -r -s ip
+adb connect $ip > /dev/null 2>/dev/null
+if adb shell pm list packages > /dev/null 2>/dev/null;then
+break
+else
+continue
+fi
+done
+sleep 2
+adb install espeak.apk
+adb install talkback-phone.apk
+echo settings put system volume_a11y_speaker 15 |waydroid shell
+echo settings put system volume_a11y_speaker 15 |waydroid shell
+echo settings put system volume_music 15 |waydroid shell
+echo settings put system volume_music_speaker 15 |waydroid shell
+echo settings put secure tts_default_synth com.reecedunn.espeak |waydroid shell
+echo am start com.reecedunn.espeak/.CheckVoiceData |waydroid shell
+sleep 2
+echo am start com.reecedunn.espeak/.DownloadVoiceData |waydroid shell
+sleep 2
+echo settings put secure accessibility_enabled 1 |waydroid shell
+echo settings put secure enabled_accessibility_services com.android.talkbackfoss/com.google.android.marvin.talkback.TalkBackService|waydroid shell
+if [ -z $notermux ];then
+chown -R $SUDO_USER:$SUDO_USER $mytmp
+sudo -u $SUDO_USER sh -c "for f in \"com.termux\" \"com.termux.api\";do if adb shell pm list packages|grep -qx package:\$f;then continue;else while true;do export vercode=\`lynx --dump https://f-droid.org/en/packages/\$f/|grep -i \*\ version|head -n 1|cut -f 2 -d \(|cut -f 1 -d \)\`;if curl -Lo \$f\".apk\" https://f-droid.org/repo/\$f\"_\"\$vercode\".apk\";then adb install \$f\".apk\";rm \$f\".apk\";break;else continue;fi;done;fi;done;echo clear\\;if pgrep -af sshd\;then sleep .01\;else sshd\;fi > /tmp/spsc;adb push /tmp/spsc /sdcard/spinit;rm /tmp/spsc;echo|ssh-keygen -t ed25519 -f ~/.speechkey;adb push ~/.speechkey.pub /sdcard/key;adb shell \"pm grant com.termux android.permission.READ_EXTERNAL_STORAGE\";adb shell \"pm grant com.termux android.permission.WRITE_EXTERNAL_STORAGE\";adb shell am start com.termux/com.termux.app.TermuxActivity;sleep 5;adb shell input text \"clear\\;apt-get\ -yyqq\ update\\;DEBIAN_FRONTEND=noninteractive\ apt-get\ -yyqq\ -o\ Dpkg::Options::\=--force-confdef\ -o\ Dpkg::Options::\=--force-confnew\ dist-upgrade\\;apt-get\ -yyqq\ update\\;apt-get\ -yyqq\ install\ openssh\ termux-api\\;termux-setup-storage\\;cd\\;mkdir\ -p\ .ssh\\;mv\ /sdcard/key\ ~/.ssh/authorized_keys\\;cat\ /sdcard/spinit\ \>\>\ .bashrc\\;rm\ /sdcard/spinit\\;sshd\\;clear\";adb shell input keyevent ENTER"
+else
+sleep .01
+fi
+sudo -u $SUDO_USER waydroid session stop
+killall -9 weston
+systemctl restart waydroid-container
+if [ -z $nodesktop ];then
+if [ -e /home/$SUDO_USER/bin ];then
+sleep .01
+else
+mkdir -p /home/$SUDO_USER/bin
+fi
+if which wdd > /dev/null 2>/dev/null;then
+sleep .01
+else
+base64 -d > /home/$SUDO_USER/bin/wdd<<EOF
+IyEvYmluL3pzaApmdW5jdGlvbiBzdGFydAp7Cndlc3RvbiAtLXh3YXlsYW5kIC1pIDAgLVN3YXlk
+cm9pZCYKc2xlZXAgMgpleHBvcnQgV0FZTEFORF9ESVNQTEFZPXdheWRyb2lkCndheWRyb2lkIHNo
+b3ctZnVsbC11aQp3aGlsZSB0cnVlO2RvCmlmIGFkYiBjb25uZWN0IFxgbm1hcCAxOTIuMTY4LjI0
+MC4wLzI0fGdyZXAgLS1iZWZvcmUtY29udGV4dD00IDU1NTUvdGNwfGhlYWQgLW4gMXxjdXQgLWYg
+NSAtZCBcICB8aGVhZCAtbiAxXGA7dGhlbgppZiBwZ3JlcCAtYWYgb3JjYTt0aGVuCmV4cG9ydCBh
+Y2Nlc3NzdGF0ZT1gYWRiIHNoZWxsIHNldHRpbmdzIGdldCBzZWN1cmUgYWNjZXNzaWJpbGl0eV9l
+bmFibGVkYApleHBvcnQgc3Zjcz1gYWRiIHNoZWxsIHNldHRpbmdzIGdldCBzZWN1cmUgZW5hYmxl
+ZF9hY2Nlc3NpYmlsaXR5X3NlcnZpY2VzYAphZGIgc2hlbGwgc2V0dGluZ3MgcHV0IHNlY3VyZSBh
+Y2Nlc3NpYmlsaXR5X2VuYWJsZWQgJGFjY2Vzc3N0YXRlCmFkYiBzaGVsbCBzZXR0aW5ncyBwdXQg
+c2VjdXJlIGVuYWJsZWRfYWNjZXNzaWJpbGl0eV9zZXJ2aWNlcyAkc3ZjcwpicmVhawpmaQplbHNl
+CmJyZWFrCmZpCmRvbmUKZXhpdAp9CmZ1bmN0aW9uIHN0b3AKewp3YXlkcm9pZCBzZXNzaW9uIHN0
+b3AKa2lsbGFsbCAtOSB3ZXN0b24gYWRiCmV4aXQKfQpjYXNlICIkMSIgaW4Kc3RhcnQpCnN0YXJ0
+Cjs7CnN0b3ApCnN0b3AKOzsKKikKZWNobyB1c2FnZTogJDAgXDxzdG9wXHxzdG9wXD4KZXhpdCAy
+Cjs7CmVzYWMK
+EOF
+chown $SUDO_USER:$SUDO_USER /home/$SUDO_USER/bin /home/$SUDO_USER/bin/wdd
+chmod 700 /home/$SUDO_USER/bin/wdd
+fi
+if [ -e /home/$SUDO_USER/.config/autostart ];then
+base64 -d > /home/$SUDO_USER/.config/autostart/waydroid.desktop<<EOF
+W0Rlc2t0b3AgRW50cnldClR5cGU9QXBwbGljYXRpb24KTmFtZT13YXlkcm9pZApFeGVjPXNoIC1j
+ICJ3ZGQgc3RhcnQiCkhpZGRlbj1mYWxzZQpOb0Rpc3BsYXk9ZmFsc2UKWC1HTk9NRS1BdXRvc3Rh
+cnQtZW5hYmxlZD10cnVlCkNvbW1lbnRbZW5fVVNdPQo=
+EOF
+chown -R $SUDO_USER:$SUDO_USER /home/$SUDO_USER/.config/autostart/waydroid.desktop
+chmod -R 700 /home/$SUDO_USER/.config/autostart/waydroid.desktop
+fi
+else
+sleep .01
+fi
+if [ -z $nogoogle ];then
+while true;do
+if [ -e /home/$SUDO_USER/.local/share/waydroid/data/data/com.google.android.gsf/databases/gservices.db ];then
+sleep 2
+break
+else
+continue
+fi
+done
+echo select name,value from main\;|sqlite3 /home/$SUDO_USER/.local/share/waydroid/data/data/com.google.android.gsf/databases/gservices.db|grep -w android_id|sed "s|android_id\|||g"|xsel -b -i
+echo To register this device for access to google services such as the play store, please log into a google account, paste the clipboard into the Google Services Framework Android ID box, complete the audio capable CAPTCHA, and select register. If a browser does not open, go to the following url: https://www.google.com/android/uncertified/
+sudo -u $SUDO_USER sh -c "export XDG_RUNTIME_DIR=/run/user/\`id -u\`;xdg-open https://www.google.com/android/uncertified/"
+echo -n your Google Services Framework Android ID is:\  
+echo select name,value from main\;|sqlite3 /home/$SUDO_USER/.local/share/waydroid/data/data/com.google.android.gsf/databases/gservices.db|grep -w android_id|sed "s|android_id\|||g"
+else
+sleep .01
+fi
